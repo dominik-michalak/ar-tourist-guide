@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AR Bubbles and Then & Now</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b120f;
+  --panel: #121c17;
+  --line: #24332b;
+  --text: #e9efe9;
+  --muted: #93a69a;
+  --green: #0f3d1e;
+  --accent: #2fd27a;
+  --accent-ink: #0e5a33;
+  --amber: #ffb020;
+  --ui-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --head-font: "Fraunces", Georgia, serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: radial-gradient(1200px 700px at 30% 40%, #14261c 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: var(--ui-font);
+  overflow-x: hidden;
+}
+
+/* ---------- stage ---------- */
+.stage {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  gap: 56px; padding: 24px 16px;
+}
+.phone-slot { position: relative; flex: none; }
+.phone {
+  position: absolute; left: 0; top: 0;
+  width: 390px; height: 800px; transform-origin: 0 0;
+  border-radius: 54px; padding: 15px;
+  background: linear-gradient(145deg, #2b302d, #0d0f0e);
+  box-shadow: 0 0 0 2px #3c433f, 0 40px 80px -20px #000a, inset 0 0 0 2px #000;
+}
+.phone.vibrate { animation: vibrate .09s linear 7; }
+@keyframes vibrate {
+  0%,100% { translate: 0 0; } 25% { translate: -4px 1px; } 75% { translate: 4px -1px; }
+}
+.haptics { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.haptics::before, .haptics::after {
+  content: ""; position: absolute; top: 40%; width: 14px; height: 120px;
+  border: 3px solid var(--amber); border-radius: 50%;
+}
+.haptics::before { left: -30px; border-right: 0; border-top-color: transparent; border-bottom-color: transparent; }
+.haptics::after { right: -30px; border-left: 0; border-top-color: transparent; border-bottom-color: transparent; }
+.phone.vibrate .haptics { animation: haptic .6s ease-out; }
+@keyframes haptic { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+
+.screen {
+  position: relative; width: 360px; height: 770px;
+  border-radius: 40px; overflow: hidden; background: #000;
+  font-size: 13px; color: #1b241f;
+}
+.screen.no-anim, .screen.no-anim * { transition: none !important; }
+.notch {
+  position: absolute; z-index: 60; top: 9px; left: 50%; translate: -50% 0;
+  width: 108px; height: 28px; border-radius: 20px; background: #000;
+}
+.statusbar {
+  position: absolute; z-index: 55; top: 0; left: 0; right: 0; height: 44px;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 30px 0; color: #fff; font-weight: 600; font-size: 13px;
+  background: linear-gradient(#0006, transparent);
+}
+.statusbar.dark { color: #1b241f; background: none; }
+.statusbar .sig { display: flex; gap: 5px; align-items: center; }
+.statusbar .sig i { display: inline-block; width: 18px; height: 9px; border: 1.5px solid currentColor; border-radius: 3px; position: relative; }
+.statusbar .sig i::after { content: ""; position: absolute; inset: 1px; right: 4px; background: currentColor; border-radius: 1px; }
+
+/* ---------- camera world ---------- */
+.layer { position: absolute; inset: 0; }
+.world {
+  position: absolute; left: 0; top: 0; width: 360px; height: 770px;
+  transform-origin: 180px 360px;
+  animation: drift 7s ease-in-out infinite;
+}
+.world svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+@keyframes drift {
+  0%,100% { transform: scale(1.07) translate(0, 0) rotate(0deg); }
+  30% { transform: scale(1.07) translate(-9px, 3px) rotate(-.7deg); }
+  65% { transform: scale(1.07) translate(8px, -4px) rotate(.6deg); }
+}
+.world.strong { animation-duration: 3.2s; }
+.camera-grain {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: .25;
+  background: radial-gradient(ellipse at center, transparent 55%, #0008 100%);
+}
+
+/* AR stems + bubbles */
+svg.stems { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+svg.stems line { stroke: #fff; stroke-width: 1.6; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .5s ease .1s; filter: drop-shadow(0 0 2px #0008); }
+svg.stems circle { fill: var(--accent); stroke: #fff; stroke-width: 1.5; r: 0; transition: r .3s ease; }
+svg.stems .on line { stroke-dashoffset: 0; }
+svg.stems .on circle { r: 3.6px; }
+.bubble {
+  position: absolute; width: 42px; height: 42px; margin: -21px 0 0 -21px;
+  border-radius: 50%; background: #fffffff2; color: var(--accent-ink);
+  display: grid; place-items: center;
+  box-shadow: 0 4px 14px #0007, 0 0 0 2px #ffffffaa;
+  scale: 0; transition: scale .45s cubic-bezier(.3,1.6,.5,1), opacity .4s, box-shadow .3s;
+}
+.bubble svg { width: 22px; height: 22px; }
+.bubble.on { scale: 1; }
+.bubble.sel { box-shadow: 0 4px 14px #0007, 0 0 0 4px var(--accent), 0 0 24px 6px #2fd27a88; scale: 1.15; }
+.bubble.pulse::after {
+  content: ""; position: absolute; inset: -2px; border-radius: 50%;
+  border: 2px solid #fff; animation: ring 1.8s ease-out infinite;
+}
+@keyframes ring { from { opacity: .9; scale: 1; } to { opacity: 0; scale: 1.7; } }
+.reduced .bubble.on { scale: .55; opacity: .45; }
+.reduced svg.stems { opacity: .35; }
+.world svg.stems { transition: opacity .5s; }
+
+/* scanning frame */
+.scanframe {
+  position: absolute; left: 42px; top: 150px; width: 276px; height: 420px;
+  transition: all .6s cubic-bezier(.5,0,.2,1); pointer-events: none;
+}
+.scanframe i { position: absolute; width: 30px; height: 30px; border: 3px solid #fff; transition: border-color .3s; filter: drop-shadow(0 0 3px #0008); }
+.scanframe i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.scanframe i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.scanframe i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.scanframe i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.scanframe .sweep {
+  position: absolute; left: 6px; right: 6px; height: 46px; top: 0;
+  background: linear-gradient(transparent, #2fd27a55 80%, #7dffb8);
+  border-bottom: 2px solid #b9ffd8; animation: sweep 1.6s ease-in-out infinite alternate;
+}
+@keyframes sweep { from { top: 0; } to { top: calc(100% - 46px); } }
+.scanframe.found i { border-color: var(--accent); }
+.scanframe.found .sweep { display: none; }
+.scanframe.found { animation: flash .6s ease-out; }
+.scanframe.gone { opacity: 0; }
+@keyframes flash { 0% { filter: drop-shadow(0 0 0 var(--accent)); } 40% { filter: drop-shadow(0 0 14px var(--accent)); } 100% { filter: none; } }
+
+/* pills + chips */
+.pill {
+  position: absolute; left: 50%; translate: -50% 0; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 999px;
+  background: #ffffffee; color: #1b241f; font-weight: 600; font-size: 13px;
+  box-shadow: 0 6px 18px #0005; transition: opacity .35s, transform .35s;
+}
+.pill svg { width: 16px; height: 16px; }
+.pill.ok { background: var(--accent); color: #062b17; }
+.pill.warn { background: var(--amber); color: #2b1a00; }
+.pill.dark { background: #0b120fcc; color: #fff; backdrop-filter: blur(6px); }
+.hide { opacity: 0 !important; pointer-events: none; }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #1b241f33; border-top-color: #1b241f; animation: spin .8s linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
+.chips { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; }
+.chip {
+  font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: 999px;
+  background: #0b120fcc; color: #d8f5e4; display: flex; gap: 5px; align-items: center;
+  border: 1px solid #2fd27a66; transition: opacity .35s, translate .35s;
+}
+.chip svg { width: 12px; height: 12px; color: var(--accent); }
+.chip.hide { translate: 0 6px; }
+
+/* top bar */
+.topbar {
+  position: absolute; left: 12px; right: 12px; top: 46px; height: 44px;
+  display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px;
+  background: #fffffff0; border-radius: 14px; box-shadow: 0 6px 18px #0004;
+  font-weight: 700; font-size: 14px;
+  transition: opacity .4s, translate .4s;
+}
+.topbar.hide { translate: 0 -14px; }
+.topbar .ico { width: 22px; height: 22px; color: var(--accent-ink); }
+.topbar .dist { color: #5d6b63; font-weight: 500; }
+.topbar .lang { margin-left: auto; display: flex; align-items: center; gap: 4px; padding: 5px 9px; border: 1.5px solid #c9d3cd; border-radius: 999px; font-size: 12px; }
+.topbar .lang svg { width: 14px; height: 14px; }
+
+/* bottom controls + tab bar */
+.controls { position: absolute; left: 0; right: 0; top: 628px; height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; transition: opacity .3s; }
+.roundbtn {
+  width: 52px; height: 52px; border-radius: 50%; background: #fffffff0;
+  display: grid; place-items: center; color: var(--accent-ink);
+  box-shadow: 0 4px 12px #0005; position: relative;
+}
+.roundbtn svg { width: 24px; height: 24px; }
+.roundbtn small { position: absolute; bottom: -15px; font-size: 10px; color: #fff; font-weight: 600; text-shadow: 0 1px 3px #000; }
+.pausebtn { padding: 12px 18px; border-radius: 999px; background: #fffffff0; font-weight: 700; display: flex; gap: 6px; align-items: center; box-shadow: 0 4px 12px #0005; }
+.pausebtn svg { width: 16px; height: 16px; }
+.tabbar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 74px; padding-bottom: 14px;
+  background: #fff; display: grid; grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid #e3e8e5; z-index: 30;
+}
+.tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #7a8780; font-size: 11px; font-weight: 600; }
+.tab svg { width: 22px; height: 22px; }
+.tab.active { color: var(--accent-ink); }
+.tab.active span { border-bottom: 2px solid var(--accent-ink); }
+
+/* sheets / cards */
+.sheet {
+  position: absolute; left: 12px; right: 12px; z-index: 20;
+  background: #fff; border-radius: 20px; padding: 14px;
+  box-shadow: 0 -6px 30px #0006; transition: transform .5s cubic-bezier(.3,1.2,.5,1), opacity .3s;
+}
+.sheet.hide { transform: translateY(60px); }
+.sheet h3 { margin: 0 0 8px; font-size: 17px; font-family: var(--head-font); font-weight: 700; }
+.sheet .x { position: absolute; right: 12px; top: 12px; width: 28px; height: 28px; border-radius: 8px; border: 1.5px solid #c9d3cd; display: grid; place-items: center; }
+.sheet .x svg { width: 14px; height: 14px; }
+.sheet .row { display: flex; gap: 12px; }
+.thumb { flex: none; width: 96px; height: 84px; border-radius: 10px; overflow: hidden; background: #cfe3f1; border: 1px solid #d9dfdb; }
+.thumb svg { width: 100%; height: 100%; }
+.sheet p { margin: 0; font-size: 12.5px; line-height: 1.45; color: #37443d; }
+.meta { display: flex; gap: 12px; color: #5d6b63; font-size: 12px; margin-top: 4px; }
+.meta span { display: flex; align-items: center; gap: 4px; }
+.meta svg { width: 14px; height: 14px; }
+.btn { margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 12px; border: 1.5px solid #1b241f; font-weight: 700; transition: background .2s, color .2s; }
+.btn svg { width: 16px; height: 16px; }
+.btn.primary { background: var(--accent-ink); color: #fff; border-color: var(--accent-ink); }
+.btn.pressed { background: var(--accent); color: #062b17; border-color: var(--accent); }
+.player { margin-top: 10px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1.5px solid #d6ddd9; border-radius: 12px; font-size: 11px; color: #5d6b63; font-variant-numeric: tabular-nums; }
+.player .pp { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-ink); color: #fff; display: grid; place-items: center; }
+.player .pp svg { width: 12px; height: 12px; }
+.player .bar { flex: 1; height: 4px; background: #e0e6e2; border-radius: 4px; position: relative; }
+.player .bar b { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent-ink); border-radius: 4px; }
+.player .bar b::after { content: ""; position: absolute; right: -5px; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent-ink); }
+.player .wave { display: flex; gap: 2px; align-items: center; height: 14px; }
+.player .wave i { width: 2px; background: var(--accent-ink); border-radius: 2px; height: 4px; }
+.playing .wave i { animation: eq .7s ease-in-out infinite alternate; }
+.playing .wave i:nth-child(2) { animation-delay: .2s; } .playing .wave i:nth-child(3) { animation-delay: .4s; }
+@keyframes eq { to { height: 14px; } }
+.tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: #e8f6ee; color: var(--accent-ink); margin-bottom: 6px; }
+
+/* finger (tap indicator) */
+.finger {
+  position: absolute; z-index: 90; left: 180px; top: 900px; width: 44px; height: 44px; margin: -22px 0 0 -22px;
+  border-radius: 50%; background: #ffffff55; border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #0003, 0 6px 16px #0006;
+  transition: left .6s cubic-bezier(.5,0,.3,1), top .6s cubic-bezier(.5,0,.3,1), opacity .3s;
+  pointer-events: none; opacity: 0;
+}
+.finger.press { animation: press .45s ease-out; }
+.finger.press::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #fff; animation: ripple .55s ease-out forwards; }
+@keyframes press { 40% { scale: .78; background: #ffffffaa; } }
+@keyframes ripple { from { scale: .8; opacity: 1; } to { scale: 2.1; opacity: 0; } }
+
+/* ---------- side panel ---------- */
+.side { width: min(440px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; scrollbar-width: thin; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.side h1 { font-family: var(--head-font); font-weight: 600; font-size: 34px; line-height: 1.1; margin: 8px 0 6px; }
+.side .sub { color: var(--muted); margin: 0 0 22px; line-height: 1.5; font-size: 14.5px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.step {
+  display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding: 10px 14px;
+  border-radius: 14px; border: 1px solid var(--line); background: #0f1814;
+  opacity: .5; transition: opacity .3s, border-color .3s, background .3s; cursor: pointer;
+}
+.step.done { opacity: .72; }
+.step.active { opacity: 1; border-color: #2fd27a88; background: #13261b; }
+.step .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: #1c2a22; color: var(--muted); }
+.step.active .n { background: var(--accent); color: #062b17; }
+.step b { display: block; font-size: 15px; margin-bottom: 3px; }
+.step p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.step .reqs { margin-top: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+.step .reqs span { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 6px; border: 1px solid #2fd27a55; color: #9ff0c4; }
+.transport { margin-top: 18px; display: flex; align-items: center; gap: 10px; }
+.transport button {
+  font: inherit; color: var(--text); background: #1a2820; border: 1px solid var(--line);
+  border-radius: 10px; height: 36px; padding: 0 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+.transport button:hover { border-color: var(--accent); }
+.transport svg { width: 16px; height: 16px; }
+.progress { flex: 1; height: 6px; border-radius: 6px; background: #1c2a22; overflow: hidden; }
+.progress b { display: block; height: 100%; width: 0; background: var(--accent); }
+.switch { margin-top: 16px; font-size: 13.5px; color: var(--muted); }
+.switch a { color: var(--accent); }
+.credit { margin-top: 6px; font-size: 12px; color: #61746a; }
+
+@media (max-width: 900px) {
+  .stage { flex-direction: column; gap: 24px; }
+  .side { max-height: none; }
+  .side h1 { font-size: 26px; }
+}
+</style>
+<style>
+  .archive { opacity: 0; transition: opacity .5s; filter: sepia(.85) contrast(1.05) brightness(.95); }
+  .archive.on { opacity: 1; }
+  .tn-line { position: absolute; top: 96px; bottom: 140px; width: 0; border-left: 2.5px solid #fff; filter: drop-shadow(0 0 4px #000a); opacity: 0; transition: opacity .4s; }
+  .tn-line.on { opacity: 1; }
+  .tn-line .knob { position: absolute; top: 46%; left: -19px; width: 36px; height: 36px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-weight: 800; color: var(--accent-ink); font-size: 15px; box-shadow: 0 4px 12px #0006; }
+  .tn-label { position: absolute; top: 152px; font-size: 11px; font-weight: 800; letter-spacing: .1em; padding: 5px 9px; border-radius: 8px; transition: opacity .4s; }
+  .tn-label.then { left: 14px; background: #3a2d1aee; color: #f4e3c0; }
+  .tn-label.now { right: 14px; background: #ffffffee; color: var(--accent-ink); }
+  .years { position: absolute; left: 14px; right: 14px; top: 572px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 14px; background: #0b120fcc; backdrop-filter: blur(6px); transition: opacity .4s; }
+  .years::before { content: ""; position: absolute; left: 26px; right: 26px; top: 50%; height: 2px; background: #ffffff44; }
+  .years span { position: relative; font-size: 11px; font-weight: 700; color: #cfe; padding: 4px 8px; border-radius: 999px; background: #1a2820; transition: background .3s, color .3s; }
+  .years span.on { background: var(--amber); color: #2b1a00; }
+  .world .bubbles { transition: opacity .4s; }
+  .world .bubbles.hide { opacity: 0; }
+</style>
+</head>
+<body>
+<main class="stage">
+  <div class="phone-slot"><div class="phone"><div class="screen"></div><div class="haptics"></div></div></div>
+  <section class="side">
+    <div class="eyebrow">AR Mobile Tourist Guide · Animation 1 of 2</div>
+    <h1>Point, recognize, explore</h1>
+    <p class="sub">Building recognition with interactive AR bubbles, then an archival photo aligned with the live view. Poznań Old Market Square.</p>
+    <ol class="steps"></ol>
+    <div class="transport">
+      <button id="play"></button>
+      <button id="restart" title="Restart (R)">↺ Restart</button>
+      <div class="progress"><b></b></div>
+    </div>
+    <p class="switch">Next: <a href="animation-2-navigation.html">Animation 2 · Radar, map &amp; safety →</a></p>
+    <p class="credit">Concept by Zuzanna Musielak &amp; Dominik Michalak · WSB Merito Poznań. Archival view is an illustrative reconstruction.</p>
+  </section>
+</main>
+
+<script>
+// Shared building blocks for the AR Mobile Tourist Guide animations.
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+// ---------- icons (24x24, stroke = currentColor) ----------
+const P = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  camera: P('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+  pin: P('<path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>'),
+  heart: P('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+  gear: P('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'),
+  book: P('<path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6v14"/>'),
+  photo: P('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>'),
+  video: P('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>'),
+  people: P('<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 2 6 5"/>'),
+  radar: P('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1" fill="currentColor"/>'),
+  clock: P('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  pause: P('<path d="M9 5v14M15 5v14"/>'),
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>',
+  speaker: P('<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>'),
+  globe: P('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>'),
+  close: P('<path d="M6 6l12 12M18 6L6 18"/>'),
+  building: P('<path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-5h6v5M12 5V2"/>'),
+  walk: P('<circle cx="13" cy="4" r="2"/><path d="M9 21l2-6 3 3v3M11 15l1-6 4 3h3M12 9l-4 2-1 4"/>'),
+  turnRight: P('<path d="M6 20v-8a4 4 0 0 1 4-4h9"/><path d="M15 4l4 4-4 4"/>'),
+  warn: P('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'),
+  phone: P('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
+  search: P('<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>'),
+  back: P('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
+  arrow: P('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  compass: P('<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'),
+  sat: P('<path d="M5 19a10 10 0 0 1 0-14M8 16a6 6 0 0 1 0-8"/><circle cx="12" cy="12" r="2"/><path d="M14 10l6-6"/>'),
+  check: P('<path d="M5 12l5 5 9-10"/>'),
+  hand: P('<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4a1.5 1.5 0 0 1 3 0v6M14 10V5.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3 13.5a1.5 1.5 0 0 1 2.5-1.6L8 15"/>'),
+};
+
+// ---------- scene drawing ----------
+const arch = (x, y, w, h) => `M${x} ${y + h}V${y + w / 2}A${w / 2} ${w / 2} 0 0 1 ${x + w} ${y + w / 2}V${y + h}Z`;
+
+// Stylised Poznań Town Hall (Renaissance loggia facade + central tower), centred at x=180.
+function townHall({ damaged = false } = {}) {
+  const fac = '#efe3c6', facLine = '#b6a07a', archFill = damaged ? '#2a2119' : '#6f5c45';
+  let s = '';
+  // ground-level shadow
+  s += `<ellipse cx="180" cy="562" rx="128" ry="7" fill="#0002"/>`;
+  // main body
+  s += `<rect x="70" y="372" width="220" height="188" fill="${fac}" stroke="${facLine}"/>`;
+  // three tiers of loggia arcades, 7 bays
+  const tiers = [[392, 44], [444, 48], [498, 62]];
+  const bw = 220 / 7;
+  tiers.forEach(([y, h], ti) => {
+    for (let i = 0; i < 7; i++) {
+      const x = 70 + i * bw + 4;
+      s += `<path d="${arch(x, y, bw - 8, h - 6)}" fill="${archFill}"/>`;
+      if (!damaged) s += `<path d="${arch(x + 3, y + 4, bw - 14, h - 10)}" fill="#8b7559" opacity=".55"/>`;
+    }
+    s += `<rect x="66" y="${y - 4}" width="228" height="4" fill="#d9c79f"/>`;
+  });
+  // attic with blind arcade
+  s += `<rect x="70" y="338" width="220" height="34" fill="#e6d4ae" stroke="${facLine}"/>`;
+  for (let i = 0; i < 11; i++) s += `<path d="${arch(76 + i * 19.6, 344, 12, 22)}" fill="#cdb98e"/>`;
+  // pinnacles on the attic
+  [76, 128, 232, 284].forEach((x, i) => {
+    if (damaged && i === 3) return;
+    s += `<path d="M${x - 6} 338L${x} 316L${x + 6} 338Z" fill="#e6d4ae" stroke="${facLine}"/><circle cx="${x}" cy="313" r="2.5" fill="#c9a23a"/>`;
+  });
+  if (damaged) {
+    // war damage: broken tower stump, holes, scorch marks
+    s += `<path d="M160 338V282l6-6 4 8 6-12 5 10 7-9 4 7 6-4v62Z" fill="#d7c7a2" stroke="#7a6a50"/>`;
+    s += `<path d="M170 300h8v14h-8zM186 296h7v18h-7z" fill="#2a2119"/>`;
+    s += `<path d="M96 380l14 6-4 12-12-2zM238 452l18 4-6 16-14-6zM120 520l10 2-2 12-10-3z" fill="#2a2119"/>`;
+    s += `<path d="M70 372L98 350 126 360 160 338H70Z" fill="#7a6a50" opacity=".55"/>`;
+    s += `<rect x="70" y="338" width="220" height="222" fill="url(#scorch)"/>`;
+    return s;
+  }
+  // tower base + clock
+  s += `<rect x="160" y="250" width="40" height="88" fill="${fac}" stroke="${facLine}"/>`;
+  s += `<rect x="173" y="256" width="14" height="9" rx="2" fill="#6f5c45"/>`; // goats' door
+  s += `<circle cx="180" cy="285" r="12" fill="#faf3df" stroke="#8a6d3b" stroke-width="2"/><path d="M180 285V277M180 285l6 3" stroke="#3a2d1a" stroke-width="1.8" stroke-linecap="round"/>`;
+  s += `<path d="${arch(172, 304, 16, 26)}" fill="#6f5c45"/>`;
+  s += `<rect x="155" y="245" width="50" height="6" fill="#d9c79f" stroke="${facLine}"/>`;
+  // octagonal stage
+  s += `<rect x="166" y="205" width="28" height="40" fill="#ead9b0" stroke="${facLine}"/>`;
+  s += `<path d="${arch(170, 212, 8, 24)}" fill="#6f5c45"/><path d="${arch(182, 212, 8, 24)}" fill="#6f5c45"/>`;
+  s += `<rect x="162" y="200" width="36" height="5" fill="#d9c79f" stroke="${facLine}"/>`;
+  // copper dome, lantern, spire, eagle
+  s += `<path d="M165 200Q165 176 180 170Q195 176 195 200Z" fill="#5d8a6c" stroke="#3e6650"/>`;
+  s += `<rect x="176" y="154" width="8" height="17" fill="#ead9b0" stroke="${facLine}"/>`;
+  s += `<path d="M174 155Q180 144 186 155Z" fill="#5d8a6c" stroke="#3e6650"/>`;
+  s += `<path d="M180 146V118" stroke="#3e6650" stroke-width="2"/>`;
+  s += `<path d="M180 112l-7 3 4 1-2 3 5-2 5 2-2-3 4-1z" fill="#c9a23a"/>`;
+  return s;
+}
+
+// Narrow merchant house with gable, standing on y=560
+function house(x, w, h, color, { gable = 'tri', dark = '#4b3d2e' } = {}) {
+  const top = 560 - h;
+  let s = `<rect x="${x}" y="${top}" width="${w}" height="${h}" fill="${color}" stroke="#0002"/>`;
+  if (gable === 'tri') s += `<path d="M${x - 2} ${top}L${x + w / 2} ${top - w * 0.45}L${x + w + 2} ${top}Z" fill="${color}" stroke="#0002"/>`;
+  else s += `<path d="M${x} ${top}h${w}v-12h-${w * 0.18}v-12h-${w * 0.18}v-10h-${w * 0.28}v10h-${w * 0.18}v12h-${w * 0.18}z" fill="${color}" stroke="#0002"/>`;
+  const cols = Math.max(2, Math.round(w / 22)), cw = w / cols;
+  for (let r = 0; top + 18 + r * 34 < 520; r++)
+    for (let c = 0; c < cols; c++)
+      s += `<rect x="${x + c * cw + cw * 0.28}" y="${top + 16 + r * 34}" width="${cw * 0.44}" height="20" rx="1.5" fill="${dark}" opacity=".75"/>`;
+  s += `<path d="${arch(x + w / 2 - 9, 528, 18, 32)}" fill="${dark}"/>`;
+  return s;
+}
+
+const SCENE_DEFS = `
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fb5dd"/><stop offset=".6" stop-color="#cfe2ee"/><stop offset="1" stop-color="#eef1ea"/></linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8aa93"/><stop offset="1" stop-color="#8c7f6b"/></linearGradient>
+    <pattern id="cobble" width="16" height="9" patternUnits="userSpaceOnUse"><rect width="16" height="9" fill="none"/><path d="M0 9h16M8 0v9M0 0v4.5M16 4.5v4.5" stroke="#0000001a" stroke-width="1"/></pattern>
+    <radialGradient id="scorch" cx=".5" cy=".2" r=".8"><stop offset="0" stop-color="#2a2119" stop-opacity=".35"/><stop offset="1" stop-color="#2a2119" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .2  0 0 0 0 .15  0 0 0 0 .1  0 0 0 .55 0"/></filter>
+  </defs>`;
+
+function groundAndSky() {
+  return `<rect width="360" height="770" fill="url(#sky)"/>
+    <ellipse cx="80" cy="150" rx="60" ry="14" fill="#fff" opacity=".55"/><ellipse cx="290" cy="110" rx="48" ry="11" fill="#fff" opacity=".5"/>
+    <rect y="560" width="360" height="210" fill="url(#ground)"/><rect y="560" width="360" height="210" fill="url(#cobble)"/>
+    <path d="M180 560L-120 770M180 560L480 770M180 560L60 770M180 560L300 770" stroke="#fff" stroke-opacity=".12" stroke-width="2"/>`;
+}
+
+// Market-square scene with the Town Hall
+function townHallScene({ damaged = false } = {}) {
+  let s = `<svg class="scene" viewBox="0 0 360 770" preserveAspectRatio="xMidYMid slice">${SCENE_DEFS}${groundAndSky()}`;
+  s += house(-14, 46, 200, damaged ? '#cbbd9c' : '#e8a87c');
+  s += house(30, 44, 170, damaged ? '#bfb291' : '#9cc4b2', { gable: 'step' });
+  s += house(290, 44, 175, damaged ? '#c4b796' : '#f2cf73', { gable: 'step' });
+  s += house(332, 46, 205, damaged ? '#cbbd9c' : '#d98a8a');
+  s += townHall({ damaged });
+  if (damaged) s += `<rect width="360" height="770" filter="url(#grain)" opacity=".9"/>`;
+  return s + '</svg>';
+}
+
+// Street scene (no supported landmark in view) with tram tracks
+function streetScene() {
+  let s = `<svg class="scene" viewBox="0 0 360 770" preserveAspectRatio="xMidYMid slice">${SCENE_DEFS}${groundAndSky()}`;
+  const cols = ['#e8a87c', '#9cc4b2', '#f2cf73', '#d98a8a', '#b5a7d6', '#e8a87c', '#9cc4b2', '#f2cf73'];
+  let x = -40;
+  cols.forEach((c, i) => { const w = 50 + (i % 3) * 8; s += house(x, w, 190 + ((i * 37) % 60), c, { gable: i % 2 ? 'step' : 'tri' }); x += w + 2; });
+  s += `<path d="M150 560L40 770M210 560L320 770M162 560L90 770M198 560L270 770" stroke="#5b5145" stroke-width="3"/>`;
+  return s + '</svg>';
+}
+
+// Tiny thumbnail of the town hall (for cards)
+function thumbSVG(sepia = false) {
+  return `<svg viewBox="40 90 280 480" preserveAspectRatio="xMidYMid slice" style="${sepia ? 'filter:sepia(1)' : ''}">${SCENE_DEFS}<rect x="0" y="0" width="360" height="770" fill="url(#sky)"/><rect y="560" width="360" height="210" fill="url(#ground)"/>${townHall()}</svg>`;
+}
+
+// ---------- shared phone chrome ----------
+const statusBar = (dark = false) => `<div class="statusbar${dark ? ' dark' : ''}"><span>12:00</span><span class="sig">5G <i></i></span></div>`;
+const tabBar = (active = 0) => `<div class="tabbar">${[['camera', 'AR View'], ['pin', 'Map'], ['heart', 'Favourites'], ['gear', 'Settings']]
+  .map(([ic, l], i) => `<div class="tab${i === active ? ' active' : ''}">${ICON[ic]}<span>${l}</span></div>`).join('')}</div>`;
+const topBar = (name, dist, hidden = true) => `<div class="topbar${hidden ? ' hide' : ''}"><span class="ico">${ICON.building}</span><span>${name}</span><span class="dist">• ${dist}</span><span class="lang">${ICON.globe}EN ▾</span></div>`;
+
+// ---------- timeline engine ----------
+const ease = { inOut: (p) => (p < .5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2), lin: (p) => p, out: (p) => 1 - (1 - p) ** 3 };
+
+class Timeline {
+  constructor({ duration, steps, build }) {
+    this.duration = duration; this.steps = steps; this.build = build;
+    this.cues = []; this.tweens = []; this.t = 0; this.i = 0; this.playing = true; this.last = null; this.lag = 0;
+  }
+  at(t, fn) { this.cues.push([t, fn]); return this; }
+  tween(d, fn, e = ease.inOut) { const tw = { d, fn, e, el: this.lag }; this.tweens.push(tw); fn(e(Math.min(1, tw.el / d))); }
+  fire() {
+    while (this.i < this.cues.length && this.cues[this.i][0] <= this.t) {
+      this.lag = this.t - this.cues[this.i][0]; this.cues[this.i][1](); this.i++;
+    }
+    this.lag = 0;
+  }
+  restart() { this.t = 0; this.i = 0; this.tweens = []; this.build(); }
+  seek(target) {
+    this.restart(); const scr = $('.screen'); scr.classList.add('no-anim');
+    this.t = target; this.fire(); this.stepTweens(0); void scr.offsetWidth;
+    requestAnimationFrame(() => scr.classList.remove('no-anim'));
+  }
+  stepTweens(dt) {
+    this.tweens = this.tweens.filter((tw) => { tw.el += dt; const p = Math.min(1, tw.el / tw.d); tw.fn(tw.e(p)); return p < 1; });
+  }
+  toggle() {
+    this.playing = !this.playing;
+    if (!this.playing) { this.frozen = document.getAnimations().filter((a) => a.playState === 'running'); this.frozen.forEach((a) => a.pause()); }
+    else (this.frozen || []).forEach((a) => a.play());
+    this.ui(true);
+  }
+  start() {
+    this.cues.sort((a, b) => a[0] - b[0]);
+    this.renderPanel(); this.restart();
+    const tick = (ts) => {
+      const dt = this.last == null ? 0 : Math.min(.1, (ts - this.last) / 1000); this.last = ts;
+      if (this.playing) {
+        this.t += dt; this.fire(); this.stepTweens(dt);
+        if (this.t >= this.duration) this.restart();
+      }
+      this.ui(); requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); this.toggle(); }
+      if (e.key === 'r') this.restart();
+    });
+  }
+  renderPanel() {
+    $('.steps').innerHTML = this.steps.map((s, i) => `<li class="step" data-i="${i}"><span class="n">${i + 1}</span><div><b>${s.title}</b><p>${s.text}</p><div class="reqs">${(s.reqs || []).map((r) => `<span>${r}</span>`).join('')}</div></div></li>`).join('');
+    $$('.step').forEach((el) => el.addEventListener('click', () => this.seek(this.steps[+el.dataset.i].t + .01)));
+    $('#play').addEventListener('click', () => this.toggle());
+    $('#restart').addEventListener('click', () => this.restart());
+  }
+  ui(force) {
+    $('.progress b').style.width = `${(this.t / this.duration) * 100}%`;
+    let cur = 0; this.steps.forEach((s, i) => { if (this.t >= s.t) cur = i; });
+    if (cur !== this.cur || force) {
+      this.cur = cur;
+      $$('.step').forEach((el, i) => { el.classList.toggle('active', i === cur); el.classList.toggle('done', i < cur); });
+    }
+    $('#play').innerHTML = this.playing ? `${ICON.pause}Pause` : `${ICON.play}Play`;
+  }
+}
+
+// screen-space centre of an element (undoes the phone's fit scale)
+function centerOf(sel) {
+  const scr = $('.screen').getBoundingClientRect(), r = $(sel).getBoundingClientRect(), k = scr.width / 360;
+  return [(r.left + r.width / 2 - scr.left) / k, (r.top + r.height / 2 - scr.top) / k];
+}
+
+// tap indicator: finger glides to a target (x,y or a selector) and presses at time t
+function tap(tl, t, x, y, { stay = false } = {}) {
+  tl.at(t - .65, () => {
+    const [px, py] = typeof x === 'string' ? centerOf(x) : [x, y];
+    const f = $('.finger'); f.style.left = px + 'px'; f.style.top = py + 'px'; f.style.opacity = 1;
+  });
+  tl.at(t, () => { const f = $('.finger'); f.classList.remove('press'); void f.offsetWidth; f.classList.add('press'); });
+  if (!stay) tl.at(t + .55, () => { $('.finger').style.opacity = 0; });
+}
+
+// fit the 390x800 phone into the viewport
+function fitPhone() {
+  const slot = $('.phone-slot'), ph = $('.phone');
+  const narrow = innerWidth < 900;
+  const s = Math.min(1, (innerHeight - 48) / 800, (narrow ? innerWidth - 32 : innerWidth * .5) / 390);
+  ph.style.transform = `scale(${s})`; slot.style.width = 390 * s + 'px'; slot.style.height = 800 * s + 'px';
+}
+addEventListener('resize', fitPhone);
+addEventListener('DOMContentLoaded', fitPhone);
+</script>
+<script>
+// AR bubbles: [anchorX, anchorY, bubbleX, bubbleY, icon]
+const BUBBLES = [
+  [180, 285, 238, 248, 'book'],    // clock tower (mechanical goats)
+  [115, 416, 72, 376, 'photo'],    // loggia
+  [180, 532, 236, 486, 'video'],   // main portal
+  [284, 314, 314, 270, 'people'],  // attic pinnacle (merchant's tale)
+];
+
+function build() {
+  const scr = $('.screen');
+  scr.innerHTML = `
+    <div class="notch"></div>${statusBar()}
+    <div class="world">
+      ${townHallScene()}
+      <div class="archive layer">${townHallScene({ damaged: true })}</div>
+      <div class="tn-line" style="left:360px"><span class="knob">⇆</span></div>
+      <div class="bubbles layer">
+        <svg class="stems" viewBox="0 0 360 770">${BUBBLES.map(([ax, ay, bx, by], i) => `<g data-i="${i}"><line pathLength="1" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/><circle cx="${ax}" cy="${ay}"/></g>`).join('')}</svg>
+        ${BUBBLES.map(([, , bx, by, ic], i) => `<div class="bubble b${i}" style="left:${bx}px;top:${by}px">${ICON[ic]}</div>`).join('')}
+      </div>
+    </div>
+    <div class="camera-grain"></div>
+    <div class="scanframe"><i></i><i></i><i></i><i></i><div class="sweep"></div></div>
+    <div class="pill status" style="top:102px"><span class="spinner"></span><span class="msg">Looking for a building…</span></div>
+    <div class="chips" style="top:146px">
+      <span class="chip hide gps">${ICON.sat}GPS 52.4073° N, 16.9339° E</span>
+      <span class="chip hide compass">${ICON.compass}Heading 358° N</span>
+    </div>
+    ${topBar('Poznań Town Hall', '120 m')}
+    <div class="pill dark tn-pill hide" style="top:102px">${ICON.clock}Then &amp; Now · drag to compare</div>
+    <span class="tn-label then hide">ARCHIVE · 1945</span><span class="tn-label now hide">TODAY</span>
+    <div class="years hide"><span>1550</span><span>1783</span><span class="y45">1945</span><span>Today</span></div>
+    <div class="controls">
+      <div class="roundbtn">${ICON.radar}<small>Radar</small></div>
+      <div class="pausebtn">${ICON.pause}Pause AR</div>
+      <div class="roundbtn timeline-btn">${ICON.clock}<small>Timeline</small></div>
+    </div>
+    <div class="sheet card hide" style="bottom:150px">
+      <span class="tag">STORY · FR2 · FR5</span>
+      <h3>Poznań Town Hall</h3>
+      <span class="x">${ICON.close}</span>
+      <div class="row">
+        <div class="thumb">${thumbSVG()}</div>
+        <p>Renaissance town hall from the 16th century, famous for its mechanical goats that appear daily at 12:00.</p>
+      </div>
+      <div class="player"><span class="pp">${ICON.play}</span><span class="cur">0:00</span><span class="bar"><b></b></span><span>0:35</span><span class="wave"><i></i><i></i><i></i></span></div>
+    </div>
+    ${tabBar(0)}
+    <div class="finger"></div>`;
+}
+
+const tl = new Timeline({
+  duration: 19.5, build,
+  steps: [
+    { t: 0, title: 'Point the camera & scan', text: 'A thin scanning frame appears. GPS position and compass heading narrow the search to buildings nearby before image analysis.', reqs: ['FR1', 'FR3'] },
+    { t: 2.8, title: 'Building recognized', text: 'Poznań Town Hall is identified in under 2 seconds; its name and distance appear in the top bar.', reqs: ['FR1', 'NFR1'] },
+    { t: 3.6, title: 'Bubbles anchor to real details', text: 'Info bubbles attach to the clock tower, loggia, portal and attic, and stay in place while the phone moves.', reqs: ['FR2', '3D anchors', 'NFR1'] },
+    { t: 6.0, title: 'Tap a bubble → info card', text: 'A card opens with a short fact, a photo and an audio story. The close button returns to the camera view.', reqs: ['FR2', 'FR5'] },
+    { t: 10.6, title: 'Then & Now overlay', text: 'The timeline aligns an archival photo with the live view. A slider reveals what was destroyed in 1945 and rebuilt.', reqs: ['FR6', 'FR7', 'Immersion'] },
+  ],
+});
+
+const S = (sel) => $(sel);
+tl.at(.7, () => S('.gps').classList.remove('hide'))
+  .at(1.3, () => S('.compass').classList.remove('hide'))
+  .at(2.8, () => {
+    const f = S('.scanframe'); f.classList.add('found');
+    Object.assign(f.style, { left: '58px', top: '100px', width: '244px', height: '478px' });
+    const st = S('.status'); st.classList.add('ok'); st.innerHTML = `${ICON.check}<span>Building recognized</span>`;
+    S('.topbar').classList.remove('hide');
+    $$('.chip').forEach((c) => c.classList.add('hide'));
+  })
+  .at(4.0, () => { S('.scanframe').classList.add('gone'); S('.status').classList.add('hide'); });
+BUBBLES.forEach((_, i) => tl.at(3.6 + i * .22, () => {
+  S(`.b${i}`).classList.add('on'); S(`.stems g[data-i="${i}"]`).classList.add('on');
+}));
+tl.at(4.5, () => { S('.world').classList.add('strong'); S('.b0').classList.add('pulse'); })
+  .at(6.6, () => S('.world').classList.remove('strong'));
+
+// open the story card
+tap(tl, 6.6, '.b0');
+tl.at(6.6, () => {
+  S('.b0').classList.remove('pulse'); S('.b0').classList.add('sel');
+  S('.card').classList.remove('hide'); S('.player').classList.add('playing');
+  tl.tween(3.6, (p) => {
+    S('.player .bar b').style.width = p * 62 + '%';
+    const s = Math.round(p * 22); S('.player .cur').textContent = `0:${String(s).padStart(2, '0')}`;
+  }, ease.lin);
+});
+tap(tl, 10.3, '.card .x');
+tl.at(10.3, () => { S('.card').classList.add('hide'); S('.b0').classList.remove('sel'); });
+
+// Then & Now
+tap(tl, 11.2, '.timeline-btn');
+const setSplit = (x) => {
+  S('.archive').style.clipPath = `inset(0 ${360 - x}px 0 0)`;
+  S('.tn-line').style.left = x + 'px';
+};
+tl.at(11.2, () => {
+  setSplit(360);
+  S('.archive').classList.add('on'); S('.bubbles').classList.add('hide');
+  ['.tn-pill', '.years', '.tn-label.then', '.tn-label.now'].forEach((s) => S(s).classList.remove('hide'));
+  S('.controls').classList.add('hide');
+})
+  .at(11.8, () => { S('.y45').classList.add('on'); S('.tn-line').classList.add('on'); })
+  .at(12.3, () => tl.tween(2.2, (p) => setSplit(352 - 300 * p)))
+  .at(14.8, () => tl.tween(1.8, (p) => setSplit(52 + 260 * p)))
+  .at(16.8, () => tl.tween(.9, (p) => setSplit(312 - 132 * p)))
+  .at(18.4, () => {
+    ['.tn-pill', '.years', '.tn-label.then', '.tn-label.now'].forEach((s) => S(s).classList.add('hide'));
+    S('.archive').classList.remove('on'); S('.tn-line').classList.remove('on');
+    S('.bubbles').classList.remove('hide'); S('.controls').classList.remove('hide');
+  });
+tap(tl, 18.2, '.tn-pill');
+
+tl.start();
+</script>
+</body>
+</html>
