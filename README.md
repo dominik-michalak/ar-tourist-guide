@@ -71,4 +71,9 @@ While walking, bubbles shrink to small transparent icons. Once the user stands s
 
 ---
 
+Here is the prototype video presentation:
+![Watch the video](AR_Tourist_Guide_demo_20261126_093419.mp4)
+
+---
+
 *The archival view is an illustrative reconstruction.*
